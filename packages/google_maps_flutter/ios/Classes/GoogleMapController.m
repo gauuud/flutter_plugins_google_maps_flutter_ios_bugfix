@@ -60,12 +60,13 @@ static void interpretMarkerOptions(id json, id<FLTGoogleMapMarkerOptionsSink> si
   if ([super init]) {
     _viewId = viewId;
 
-    NSDictionary* options = args[@"options"];
-    GMSCameraPosition* camera = toOptionalCameraPosition(options[@"cameraPosition"]);
+    // NSDictionary* options = args[@"options"];
+    GMSCameraPosition* camera = toOptionalCameraPosition(args[@"cameraPosition"]);
+  
     _mapView = [GMSMapView mapWithFrame:frame camera:camera];
     _markers = [NSMutableDictionary dictionaryWithCapacity:1];
     _trackCameraPosition = NO;
-    interpretMapOptions(options, self);
+    interpretMapOptions(args, self);
     NSString* channelName =
         [NSString stringWithFormat:@"plugins.flutter.io/google_maps_%lld", viewId];
     _channel = [FlutterMethodChannel methodChannelWithName:channelName
