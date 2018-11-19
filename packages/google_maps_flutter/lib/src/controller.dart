@@ -18,16 +18,18 @@ part of google_maps_flutter;
 /// Marker tap events can be received by adding callbacks to [onMarkerTapped].
 class GoogleMapController extends ChangeNotifier {
   GoogleMapController._(
-      this._id, GoogleMapOptions options, MethodChannel channel)
+      this._id, GoogleMapOptions options, MethodChannel channel, EventChannel eventChannel)
       : assert(_id != null),
         assert(options != null),
         assert(options.cameraPosition != null),
         assert(channel != null),
-        _channel = channel {
+        _channel = channel,
+        _eventChannel = eventChannel {
     if (options.trackCameraPosition) {
       _cameraPosition = options.cameraPosition;
     }
     _channel.setMethodCallHandler(_handleMethodCall);
+    if (_eventChannel != null) _eventChannel.receiveBroadcastStream().listen(_eventListener);
     _options = GoogleMapOptions.defaultOptions.copyWith(options);
   }
 
@@ -36,13 +38,16 @@ class GoogleMapController extends ChangeNotifier {
     assert(id != null);
     assert(options != null);
     assert(options.cameraPosition != null);
-    final MethodChannel channel =
+    final MethodChannel channel = 
         MethodChannel('plugins.flutter.io/google_maps_$id');
     await channel.invokeMethod('map#waitForMap');
-    return GoogleMapController._(id, options, channel);
+    final EventChannel eventChannel = (Platform.isIOS) ? EventChannel('plugins.flutter.io/google_maps_$id#event') : null;
+    return GoogleMapController._(id, options, channel, eventChannel);
   }
 
   final MethodChannel _channel;
+
+  final EventChannel _eventChannel;
 
   /// Callbacks to receive tap events for markers placed on this map.
   final ArgumentCallbacks<Marker> onMarkerTapped = ArgumentCallbacks<Marker>();
@@ -75,6 +80,7 @@ class GoogleMapController extends ChangeNotifier {
   final int _id;
 
   Future<dynamic> _handleMethodCall(MethodCall call) async {
+    print(call.method);
     switch (call.method) {
       case 'infoWindow#onTap':
         final String markerId = call.arguments['marker'];
@@ -107,6 +113,42 @@ class GoogleMapController extends ChangeNotifier {
         throw MissingPluginException();
     }
   }
+
+  void _eventListener(dynamic event) {
+    final Map<dynamic, dynamic> map = event;
+    switch(map['event']) {
+      case 'infoWindow#onTap':
+        final String markerId = map['marker'];
+        final Marker marker = _markers[markerId];
+        if (marker != null) {
+          onInfoWindowTapped(marker);
+        }
+        break;
+
+      case 'marker#onTap':
+        final String markerId = map['marker'];
+        final Marker marker = _markers[markerId];
+        if (marker != null) {
+          onMarkerTapped(marker);
+        }
+      break;
+      case 'camera#onMoveStarted':
+        _isCameraMoving = true;
+        notifyListeners();
+        break;
+      case 'camera#onMove':
+        _cameraPosition = CameraPosition._fromJson(map['position']);
+        notifyListeners();
+        break;
+      case 'camera#onIdle':
+        _isCameraMoving = false;
+        notifyListeners();
+        break;
+      default:
+        throw MissingPluginException();
+    }
+  }
+  
 
   /// Updates configuration options of the map user interface.
   ///

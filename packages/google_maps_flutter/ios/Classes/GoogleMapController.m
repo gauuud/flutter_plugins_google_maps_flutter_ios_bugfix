@@ -49,6 +49,7 @@ static void interpretMarkerOptions(id json, id<FLTGoogleMapMarkerOptionsSink> si
   int64_t _viewId;
   NSMutableDictionary* _markers;
   FlutterMethodChannel* _channel;
+  FlutterEventSink _eventSink;
   BOOL _trackCameraPosition;
   NSObject<FlutterPluginRegistrar>* _registrar;
 }
@@ -64,6 +65,7 @@ static void interpretMarkerOptions(id json, id<FLTGoogleMapMarkerOptionsSink> si
     GMSCameraPosition* camera = toOptionalCameraPosition(args[@"cameraPosition"]);
   
     _mapView = [GMSMapView mapWithFrame:frame camera:camera];
+    _mapView.delegate = self;
     _markers = [NSMutableDictionary dictionaryWithCapacity:1];
     _trackCameraPosition = NO;
     interpretMapOptions(args, self);
@@ -77,6 +79,12 @@ static void interpretMarkerOptions(id json, id<FLTGoogleMapMarkerOptionsSink> si
         [weakSelf onMethodCall:call result:result];
       }
     }];
+
+    FlutterEventChannel *eventChannel =
+            [FlutterEventChannel eventChannelWithName:[NSString stringWithFormat:@"plugins.flutter.io/google_maps_%lld#event", viewId]
+                                      binaryMessenger:[registrar messenger]];
+    
+    [eventChannel setStreamHandler:weakSelf];                   
   }
   return self;
 }
@@ -221,28 +229,51 @@ static void interpretMarkerOptions(id json, id<FLTGoogleMapMarkerOptionsSink> si
 #pragma mark - GMSMapViewDelegate methods
 
 - (void)mapView:(GMSMapView*)mapView willMove:(BOOL)gesture {
-  [_delegate onCameraMoveStartedOnMap:_mapId gesture:gesture];
+  // [_delegate onCameraMoveStartedOnMap:_mapId gesture:gesture];
+  if (_eventSink) _eventSink(@{@"event": "camera#onMoveStarted"});
 }
 
 - (void)mapView:(GMSMapView*)mapView didChangeCameraPosition:(GMSCameraPosition*)position {
   if (_trackCameraPosition) {
-    [_delegate onCameraMoveOnMap:_mapId cameraPosition:position];
+    // [_delegate onCameraMoveOnMap:_mapId cameraPosition:position];
+    if (_eventSink) _eventSink(@{@"event": "camera#onMove", @"position": positionToJson(position)});
   }
 }
 
 - (void)mapView:(GMSMapView*)mapView idleAtCameraPosition:(GMSCameraPosition*)position {
-  [_delegate onCameraIdleOnMap:_mapId];
+  // [_delegate onCameraIdleOnMap:_mapId];
+  if (_eventSink) _eventSink(@{@"event": "camera#onIdle"});
 }
 
 - (BOOL)mapView:(GMSMapView*)mapView didTapMarker:(GMSMarker*)marker {
   NSString* markerId = marker.userData[0];
-  [_delegate onMarkerTappedOnMap:_mapId marker:markerId];
+  if (_eventSink) _eventSink(@{@"event": @"marker#onTap", @"marker": markerId});
   return [marker.userData[1] boolValue];
 }
 
 - (void)mapView:(GMSMapView*)mapView didTapInfoWindow:(GMSMarker*)marker {
   NSString* markerId = marker.userData[0];
-  [_delegate onInfoWindowTappedOnMap:_mapId marker:markerId];
+  if (_eventSink) _eventSink(@{@"event": @"infoWindow#onTap", @"marker": markerId});
+}
+
+-(void)mapView:(GMSMapView *)mapView
+didTapInfoWindowOfMarker:(GMSMarker*)marker{
+   //Info window function
+  NSString* markerId = marker.userData[0];
+  if (_eventSink) _eventSink(@{@"event": @"infoWindow#onTap", @"marker": markerId});
+}
+
+
+#pragma mark FlutterStreamHandler impl
+
+- (FlutterError*)onListenWithArguments:(id)arguments eventSink:(FlutterEventSink)eventSink {
+  _eventSink = eventSink;
+  return nil;
+}
+
+- (FlutterError*)onCancelWithArguments:(id)arguments {
+  _eventSink = nil;
+  return nil;
 }
 @end
 
@@ -465,3 +496,4 @@ static void interpretMarkerOptions(id json, id<FLTGoogleMapMarkerOptionsSink> si
     [sink setZIndex:toInt(zIndex)];
   }
 }
+
