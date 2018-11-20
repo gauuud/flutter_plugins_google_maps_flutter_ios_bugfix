@@ -230,19 +230,19 @@ static void interpretMarkerOptions(id json, id<FLTGoogleMapMarkerOptionsSink> si
 
 - (void)mapView:(GMSMapView*)mapView willMove:(BOOL)gesture {
   // [_delegate onCameraMoveStartedOnMap:_mapId gesture:gesture];
-  if (_eventSink) _eventSink(@{@"event": "camera#onMoveStarted"});
+  if (_eventSink) _eventSink(@{@"event": @"camera#onMoveStarted"});
 }
 
 - (void)mapView:(GMSMapView*)mapView didChangeCameraPosition:(GMSCameraPosition*)position {
   if (_trackCameraPosition) {
     // [_delegate onCameraMoveOnMap:_mapId cameraPosition:position];
-    if (_eventSink) _eventSink(@{@"event": "camera#onMove", @"position": positionToJson(position)});
+    if (_eventSink) _eventSink(@{@"event": @"camera#onMove", @"position": positionToJson(position)});
   }
 }
 
 - (void)mapView:(GMSMapView*)mapView idleAtCameraPosition:(GMSCameraPosition*)position {
   // [_delegate onCameraIdleOnMap:_mapId];
-  if (_eventSink) _eventSink(@{@"event": "camera#onIdle"});
+  if (_eventSink) _eventSink(@{@"event": @"camera#onIdle"});
 }
 
 - (BOOL)mapView:(GMSMapView*)mapView didTapMarker:(GMSMarker*)marker {
